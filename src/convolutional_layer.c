@@ -48,18 +48,40 @@ matrix backward_convolutional_bias(matrix dy, int n)
 // returns: column matrix
 matrix im2col(image im, int size, int stride)
 {
-    int i, j, k;
     int outw = (im.w-1)/stride + 1;
     int outh = (im.h-1)/stride + 1;
     int rows = im.c*size*size;
     int cols = outw * outh;
-    matrix col = make_matrix(rows, cols);
-
+    matrix col = make_matrix(cols, rows);
+    
     // TODO: 5.1
     // Fill in the column matrix with patches from the image
+    int padding = (size - 1)/2;
+    image pad_img = make_image(im.w + size - 1, im.h + size - 1, im.c);
+    for (int i = 0; i < im.c; i++) {
+        for (int j = 0; j < im.h; j++) {
+            for (int k = 0; k < im.w; k++) {
+                set_pixel(pad_img, k+padding, j+padding, i, get_pixel(im, k, j, i));
+            }
+        }
+    }
 
+    int col_index = 0;
+    for (int i = 0; i < im.h; i = i+stride) {
+        for (int j = 0; j < im.w; j = j+stride) {
+            for (int k = 0; k < im.c; k++) {
+                for (int l = 0; l < size; l++) {
+                    for (int m = 0; m < size; m++) {
+                        col.data[col_index] = get_pixel(pad_img, j+m, i+l, k);
+                        col_index++;
+                    }
+                }
+            }
+        }
+    }
 
-
+    col = transpose_matrix(col);
+    free_image(pad_img);
     return col;
 }
 
@@ -70,16 +92,33 @@ matrix im2col(image im, int size, int stride)
 // image im: image to add elements back into
 image col2im(int width, int height, int channels, matrix col, int size, int stride)
 {
-    int i, j, k;
-
     image im = make_image(width, height, channels);
-    int outw = (im.w-1)/stride + 1;
-    int rows = im.c*size*size;
 
     // TODO: 5.2
     // Add values into image im from the column matrix
-    
+    int padding = (size - 1)/2;
+    matrix col_t = transpose_matrix(col);
+    image pad_img = make_image(width+size-1, height+size-1, channels);
 
+    int index = 0;
+    for (int i = 0; i < pad_img.h-size+1; i = i+stride) {
+        for (int j = 0; j < pad_img.w-size+1; j = j+stride) {
+            for (int k=0; k<pad_img.c; k++) {
+                for (int l=0; l<size; l++) {
+                    for (int m =0; m < size; m++) {
+                        set_pixel(pad_img, j+m, i+l, k, col_t.data[index++] + get_pixel(pad_img, j+m, i+l,k));
+                    }
+                }
+            }
+        }
+    }
+    for(int i = 0; i < im.h; i++) {
+        for (int j = 0; j < im.w; j++) {
+            for (int k = 0; k < im.c; k++) {
+                set_pixel(im, j, i, k, get_pixel(pad_img, j+padding, i+padding, k));
+            }
+        }
+    }
 
     return im;
 }

@@ -1,3 +1,28 @@
+# HW 0 
+# Answer to Questions in the Spec
+
+# To get 97% accuracy on MNIST data: 
+#     1. Change iters (number of iterations) from 5000 to 8000
+#     2. Change rate (learning rate) from 0.01 to 0.05
+#     3. Change m (the model) from a softmax_model() to a neural_net()
+
+# This gives:
+#     - Training Accuracy: 98.31833243370056%
+#     - Test Accuracy: 96.78000211715698%
+
+# Compared to MNIST, the CIFAR dataset had significantly worse accuracy. 
+# Using the default hyperparameters, I saw the following accuracies
+#     - Training Accuracy: 38.14600110054016%
+#     - Test Accuracy: 35.429999232292175
+
+# Making the changes I made in my model for MNIST, and then benchmarking CIFAR, we get
+#     - Training Accuracy: 27.616000175476074
+#     - Test Accuracy: 26.30000114440918
+
+# Thus, making the same changes I made for MNIST, affect the results for CIFAR negatively
+# as the model performance gets significantly worse.
+#--------------------------------------------------------------------------------------------
+
 from uwnet import *
 
 mnist = 1
@@ -28,12 +53,12 @@ print
 
 print("making model...")
 batch = 128
-iters = 5000
-rate = .01
+iters = 8000
+rate = .05
 momentum = .9
 decay = .0
 
-m = softmax_model()
+m = neural_net()
 print("training...")
 train_image_classifier(m, train, batch, iters, rate, momentum, decay)
 print("done")

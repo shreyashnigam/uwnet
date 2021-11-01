@@ -21,7 +21,33 @@ matrix forward_maxpool_layer(layer l, matrix in)
     matrix out = make_matrix(in.rows, outw*outh*l.channels);
 
     // TODO: 6.1 - iterate over the input and fill in the output with max values
-
+    int padding = (l.size - 1)/2;
+    for (int i = 0; i < in.rows; i++) {
+        image img = float_to_image(in.data + i*in.cols, l.width, l.height, l.channels);
+        int index = 0;
+        for (int j = 0; j < img.h; j = j+l.stride) {
+            for (int k = 0; k < img.w; k = k+l.stride) {
+                for (int o = 0; o < img.c; o++) {
+                    float max = -1 * INFINITY;
+                    for (int m = 0; m < l.size; m++) {
+                        for (int n = 0; n < l.size; n++) {
+                            int width = k + n - padding;
+                            int height = j + m - padding;
+                            float curr;
+                            if (width > img.w || height > img.h || width < 0 || height < 0) {
+                                curr = -1 * INFINITY;
+                            } else {
+                                curr = img.data[width + img.w * (height + img.h * o)];
+                            }
+                            max = MAX(curr, max);
+                        }
+                    }
+                    out.data[outw*outh*o + index] = max;
+                }
+                index++;
+            }
+        }
+    }
 
 
     return out;
@@ -40,7 +66,40 @@ matrix backward_maxpool_layer(layer l, matrix dy)
     // TODO: 6.2 - find the max values in the input again and fill in the
     // corresponding delta with the delta from the output. This should be
     // similar to the forward method in structure.
-
+    int padding = (l.size - 1)/2;
+    for (int i = 0; i < in.rows; i++) {
+        image img = float_to_image(in.data + i*in.cols, l.width, l.height, l.channels);
+        int index = 0;
+        for (int j = 0; j < img.h; j = j+l.stride) {
+            for (int k = 0; k < img.w; k = k+l.stride) {
+                for (int o = 0; o < img.c; o++) {
+                    float max_val = -1 * INFINITY;
+                    float max_height = -1 * INFINITY;;
+                    float max_width = -1 * INFINITY;
+                    for (int m = 0; m < l.size; m++) {
+                        for (int n = 0; n < l.size; n++) {
+                            int width = k + n - padding;
+                            int height = j + m - padding;
+                            float curr;
+                            if (width > img.w || height > img.h || width < 0 || height < 0) {
+                                curr = -1 * INFINITY;
+                            } else {
+                                curr = img.data[width + img.w * (height + img.h * o)];
+                            }
+                            if (curr > max_val) {
+                                max_val = curr;
+                                max_height = height;
+                                max_width = width;
+                            }
+                        }
+                    }
+                    int dx_idnex = l.width*l.height*o + max_height*l.width + max_width;
+                    dx.data[dx_idnex] += dy.data[o*outh*outw + index];
+                }
+                index++;
+            }
+        }
+    }
 
 
     return dx;
