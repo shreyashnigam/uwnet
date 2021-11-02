@@ -93,14 +93,13 @@ matrix backward_maxpool_layer(layer l, matrix dy)
                             }
                         }
                     }
-                    int dx_idnex = l.width*l.height*o + max_height*l.width + max_width;
-                    dx.data[dx_idnex] += dy.data[o*outh*outw + index];
+                    int dx_index = l.width*l.height*o + max_height*l.width + max_width;
+                    dx.data[dx_index] += dy.data[o*outh*outw + index];
                 }
                 index++;
             }
         }
     }
-
 
     return dx;
 }

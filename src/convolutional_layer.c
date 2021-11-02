@@ -52,36 +52,34 @@ matrix im2col(image im, int size, int stride)
     int outh = (im.h-1)/stride + 1;
     int rows = im.c*size*size;
     int cols = outw * outh;
-    matrix col = make_matrix(cols, rows);
+    matrix col = make_matrix(rows, cols);
     
     // TODO: 5.1
     // Fill in the column matrix with patches from the image
     int padding = (size - 1)/2;
-    image pad_img = make_image(im.w + size - 1, im.h + size - 1, im.c);
+    int offset_multiplier =  size * size * cols;
     for (int i = 0; i < im.c; i++) {
-        for (int j = 0; j < im.h; j++) {
-            for (int k = 0; k < im.w; k++) {
-                set_pixel(pad_img, k+padding, j+padding, i, get_pixel(im, k, j, i));
-            }
-        }
-    }
-
-    int col_index = 0;
-    for (int i = 0; i < im.h; i = i+stride) {
-        for (int j = 0; j < im.w; j = j+stride) {
-            for (int k = 0; k < im.c; k++) {
+        int index = 0;
+        for (int j = 0; j < im.h; j += stride) {
+            for (int k = 0; k < im.w; k+= stride) {
+                int curr = 0;
+                int offset = i * offset_multiplier;
                 for (int l = 0; l < size; l++) {
                     for (int m = 0; m < size; m++) {
-                        col.data[col_index] = get_pixel(pad_img, j+m, i+l, k);
-                        col_index++;
+                        float pixel = 0.0;
+                        int height = j - padding + l;
+                        int width = k - padding + m;
+                        if (height >= 0 && height < im.h && width >= 0 && width < im.w) {
+                            pixel = im.data[width + im.w * (height + im.h * i)];
+                        }
+                        col.data[curr * cols+ offset + index] = pixel;
+                        curr++;
                     }
                 }
+                index++;
             }
         }
     }
-
-    col = transpose_matrix(col);
-    free_image(pad_img);
     return col;
 }
 
@@ -96,30 +94,30 @@ image col2im(int width, int height, int channels, matrix col, int size, int stri
 
     // TODO: 5.2
     // Add values into image im from the column matrix
+    int cols = col.cols;
     int padding = (size - 1)/2;
-    matrix col_t = transpose_matrix(col);
-    image pad_img = make_image(width+size-1, height+size-1, channels);
-
-    int index = 0;
-    for (int i = 0; i < pad_img.h-size+1; i = i+stride) {
-        for (int j = 0; j < pad_img.w-size+1; j = j+stride) {
-            for (int k=0; k<pad_img.c; k++) {
-                for (int l=0; l<size; l++) {
-                    for (int m =0; m < size; m++) {
-                        set_pixel(pad_img, j+m, i+l, k, col_t.data[index++] + get_pixel(pad_img, j+m, i+l,k));
+    int offset_multiplier =  size * size * cols;
+    for (int i = 0; i < channels; i++) {
+        int index = 0;
+        for (int j = 0; j < height ; j+= stride) {
+            for (int k = 0; k < width; k+= stride) {
+                int curr = 0;
+                int offset = i * offset_multiplier;
+                for (int l = 0; l < size; l++) {
+                    for (int m = 0; m < size; m++) {
+                        int curr_height = j - padding + l;
+                        int curr_width = k - padding + m;
+                        if (curr_height >= 0 && curr_height < im.h && curr_width >= 0 && curr_width < im.w) {
+                            float pixel = col.data[curr * cols + offset + index];
+                            im.data[curr_width + im.w * (curr_height + im.h * i)] += pixel;
+                        }
+                        curr++;
                     }
                 }
+                index++;
             }
         }
     }
-    for(int i = 0; i < im.h; i++) {
-        for (int j = 0; j < im.w; j++) {
-            for (int k = 0; k < im.c; k++) {
-                set_pixel(im, j, i, k, get_pixel(pad_img, j+padding, i+padding, k));
-            }
-        }
-    }
-
     return im;
 }
 
@@ -213,6 +211,11 @@ matrix backward_convolutional_layer(layer l, matrix dy)
 void update_convolutional_layer(layer l, float rate, float momentum, float decay)
 {
     // TODO: 5.3
+    axpy_matrix(decay, l.w, l.dw); 
+    axpy_matrix(rate * -1, l.dw, l.w);  
+    axpy_matrix(rate * -1, l.db, l.b);
+    scal_matrix(momentum, l.dw); 
+    scal_matrix(momentum, l.db);
 }
 
 // Make a new convolutional layer
