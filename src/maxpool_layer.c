@@ -20,35 +20,40 @@ matrix forward_maxpool_layer(layer l, matrix in)
     int outh = (l.height-1)/l.stride + 1;
     matrix out = make_matrix(in.rows, outw*outh*l.channels);
 
-    // TODO: 6.1 - iterate over the input and fill in the output with max values
+    int pool_offset_multiplier = outw * outh;
+    int img_offset_multiplier = l.width * l.height;
+
     int padding = (l.size - 1)/2;
-    for (int i = 0; i < in.rows; i++) {
-        image img = float_to_image(in.data + i*in.cols, l.width, l.height, l.channels);
-        int index = 0;
-        for (int j = 0; j < img.h; j = j+l.stride) {
-            for (int k = 0; k < img.w; k = k+l.stride) {
-                for (int o = 0; o < img.c; o++) {
-                    float max = -1 * INFINITY;
+
+    // TODO: 6.1 - iterate over the input and fill in the output with max values
+    // From Ed - Each row is a separate image
+    for (int img = 0; img < in.rows; img++) {
+        float* curr_img = in.data + img*in.cols;
+        float* pool_out = out.data + img*out.cols;
+
+        for (int i = 0; i < l.channels; i++) {
+            int pool_offset = pool_offset_multiplier * i;
+            int img_offset = img_offset_multiplier * i;
+            int submatrix_index =0;
+            for (int j = 0; j < l.height; j+=l.stride) {
+                for (int k = 0; k < l.width; k+=l.stride) {
+                    float max = FLT_MIN;
                     for (int m = 0; m < l.size; m++) {
                         for (int n = 0; n < l.size; n++) {
-                            int width = k + n - padding;
                             int height = j + m - padding;
-                            float curr;
-                            if (width > img.w || height > img.h || width < 0 || height < 0) {
-                                curr = -1 * INFINITY;
-                            } else {
-                                curr = img.data[width + img.w * (height + img.h * o)];
+                            int width = k + n - padding;
+                            if (height >= 0 && height < l.height*l.channels && width >= 0 && width < l.width) {
+                                int index = width + l.width * height + img_offset;
+                                max = MAX(curr_img[index], max);
                             }
-                            max = MAX(curr, max);
                         }
                     }
-                    out.data[outw*outh*o + index] = max;
+                    pool_out[pool_offset + submatrix_index] = max;
+                    submatrix_index++;
                 }
-                index++;
             }
         }
     }
-
 
     return out;
 }
@@ -66,37 +71,43 @@ matrix backward_maxpool_layer(layer l, matrix dy)
     // TODO: 6.2 - find the max values in the input again and fill in the
     // corresponding delta with the delta from the output. This should be
     // similar to the forward method in structure.
+
+    int delta_offset_multiplier = outw * outh;
+    int img_offset_multiplier = l.width * l.height;
+
     int padding = (l.size - 1)/2;
-    for (int i = 0; i < in.rows; i++) {
-        image img = float_to_image(in.data + i*in.cols, l.width, l.height, l.channels);
-        int index = 0;
-        for (int j = 0; j < img.h; j = j+l.stride) {
-            for (int k = 0; k < img.w; k = k+l.stride) {
-                for (int o = 0; o < img.c; o++) {
-                    float max_val = -1 * INFINITY;
-                    float max_height = -1 * INFINITY;;
-                    float max_width = -1 * INFINITY;
+
+    for (int img = 0; img < in.rows; img++) {
+        float* layer_img = in.data + img*in.cols;
+        float* dy_img = dy.data + img*dy.cols;
+        float* dx_img = dx.data + img*dx.cols;
+
+        for (int i = 0; i < l.channels; i++) {
+            int delta_offset = delta_offset_multiplier * i;
+            int img_offset = img_offset_multiplier * i;
+            int submatrix_index =0;
+            for (int j = 0; j < l.height; j+=l.stride) {
+                for (int k = 0; k < l.width; k+=l.stride) {
+                    float max = FLT_MIN;
+                    int row = 0;
+                    int col = 0;
                     for (int m = 0; m < l.size; m++) {
                         for (int n = 0; n < l.size; n++) {
-                            int width = k + n - padding;
                             int height = j + m - padding;
-                            float curr;
-                            if (width > img.w || height > img.h || width < 0 || height < 0) {
-                                curr = -1 * INFINITY;
-                            } else {
-                                curr = img.data[width + img.w * (height + img.h * o)];
-                            }
-                            if (curr > max_val) {
-                                max_val = curr;
-                                max_height = height;
-                                max_width = width;
+                            int width = k + n - padding;
+                            if (height >= 0 && height < l.height*l.channels && width >= 0 && width < l.width) {
+                                int index = width + l.width * height + img_offset;
+                                if (layer_img[index] > max) {
+                                    max = layer_img[index];
+                                    row = height;
+                                    col = width;
+                                }
                             }
                         }
                     }
-                    int dx_index = l.width*l.height*o + max_height*l.width + max_width;
-                    dx.data[dx_index] += dy.data[o*outh*outw + index];
+                    dx_img[row * l.width + col + img_offset] += dy_img[delta_offset + submatrix_index];
+                    submatrix_index++;
                 }
-                index++;
             }
         }
     }
@@ -127,5 +138,6 @@ layer make_maxpool_layer(int w, int h, int c, int size, int stride)
     l.backward = backward_maxpool_layer;
     l.update   = update_maxpool_layer;
     return l;
+
 }
 
